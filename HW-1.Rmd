@@ -1,6 +1,6 @@
 ---
 title: "MATH 216 Homework 1"
-author: "WRITE YOUR NAME HERE"
+author: "Bianca Gonzalez"
 output:
   html_document:
     toc: true
@@ -8,12 +8,14 @@ output:
     collapsed: false
     smooth_scroll: false
 ---
+deleted cache = true; for unknown reasons
+```{r, echo=FALSE, message=FALSE}
 
-```{r, echo=FALSE, message=FALSE, cache=TRUE}
 library(ggplot2)
 library(dplyr)
 # For read_csv() command, which is an improved version of base R's read.csv()
 library(readr) 
+library(lubridate)
 
 # Load data sets. Note this assumes this .Rmd files is in the same directory as
 # the .csv files.
@@ -26,23 +28,24 @@ airports <- read_csv("data/airports.csv")
 states <- read_csv("data/states.csv")
 ```
 
-
-
-
-
 ## Admistrative:
 
 Please indicate
 
 * Who you collaborated with:
+Me, Myself, and Albert Kim. (office hours on Tuesday Oct 4th.)
+
 * Roughly how much time you spent on this HW so far:
-* The URL of the RPubs published URL [here](https://www.nhl.com/).
+Likely three or four hours. I sped up as I practiced more throughout the week.
+
+* The URL of the RPubs published URL [here](http://rpubs.com/biancaglez94/215369).
+
 * What gave you the most trouble:
+The month function. Understanding conceptually what was happening with the grouping function
+and what variables to use. 
+
 * Any comments you have:
-
-
-
-
+I would like the homework to be worth more percentage points for our grades because they are where the learning happens. Or the class excercises being worth something. Incentives. 
 
 ## Question 1:
 
@@ -56,26 +59,87 @@ Using this plot, indicate describe the
 minutes tend to occur.
 
 ```{r, echo=FALSE, message=FALSE, fig.width=12, fig.height=6}
+#proportion = nominator flights delayed >30/ denominator total flights
+
+#flights delayed by thirty minutes (numerator)
+
+  #Wanto to see the flights over months to rid of some noise in plot from days
+  # when plotting carriers with delayed proportion. 
+  flights <- mutate(flights, date2 = format(flights$date, "%m"))
+  #find the number of flights delayed per carrier
+  flights_delay <- flights %>% 
+    filter(dep_delay >= 30) %>% 
+    group_by(date2, dep_delay, carrier) %>% 
+    tally() %>% 
+    rename(num_flights_30 = n) %>% 
+    arrange(desc(num_flights_30))
+ # flights_delay
+  
+
+#this is the total number of flights per carrier
+flights_tot <- flights %>%    # filter(carrier == "AA" || carrier == "DL")
+  group_by(date2, carrier) %>% 
+  tally() %>% 
+  rename(num_flights = n)
+#flights_tot
+
+#join these datasets so we can mutuate and compute proportion
+flights_prop <- inner_join(flights_tot, flights_delay, by="date2") %>% 
+  mutate(proportion_flight_delayed = num_flights_30/num_flights)
+flights_prop
+#now to plot! 
+#yaxis proportion. x axis time, so lets try months over this year. 
+#add flight carrier?
+ggplot(data=flights_prop, aes(x=date2, y=proportion_flight_delayed , col=carrier.y)) +
+geom_line()
+
+# I like this plot, but I don't like that there is so much noise, for so many carriers. Also, when looking at the data, I think there is room here for a statistical test to see what carriers are statistically signifcantly late. 
+
+#These plots shows the proportion of the airlines flights that were late throughout the year. Prefer this plot b/c. 
+
+ggplot(data=flights_prop, aes(x=date2, y=proportion_flight_delayed)) + facet_wrap(~carrier.y) +
+geom_line()
+
 
 ```
-
-
-
-
 
 ## Question 2:
 
 Some people prefer flying on older planes.  Even though they aren't as nice,
 they tend to have more room.  Which airlines should these people favor?
 
+year insufficient in providing the comfort of a passenger
+so I'm using different proxies, including year to determine
+what planes have more room. :
+
+      -no.seats = less seats the more likely to have extra leg room!
+      -no.eng = more engines, bigger plane!
+      
+by arranging in descending order of number of engines, and the number of seats, we find the 
+planes that are the largest (number of engines) and have the least number of seats
+
+Looks like CANADAIR LTD and AVIONS MARCEL DASSAULT have most legroom. 
+
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
 
+leg_room <- planes %>% 
+  filter(!is.na(year)) %>%   
+  group_by(no.eng, mfr, year) %>%  #to get size of planes by carriers (mfr)and years
+  summarise(min_seats = min(no.seats)) %>%  #get the number of seats for size of planes
+  arrange(desc(no.eng)) 
+leg_room
+
+
+#Let's just look at age of plane as per the assignment to find most legroom
+
+legroom_yr <- planes %>% 
+  filter(!is.na(year)) %>%   
+  group_by(mfr, year) %>%  #to get size of planes by carriers (mfr)and years
+  summarise(min_seats = min(no.seats)) %>%  #get the number of seats for size of planes
+  arrange(year, min_seats) 
+                          #question, can I arrange by two variables?? ie the two lowest variables                           followed by the next two lowest, and so on. 
+legroom_yr
 ```
-
-
-
-
-
 ## Question 3:
 
 * What states did Southwest Airlines' **flight paths** tend to fly to?
@@ -83,14 +147,44 @@ they tend to have more room.  Which airlines should these people favor?
 
 For example, Southwest Airlines Flight 60 to Dallas consists of a single flight
 path, but since it flew 299 times in 2013, it would be counted as 299 flights.
+```{r, echo=TRUE, message=FALSE, fig.width=12, fig.height=6}
 
-```{r, echo=FALSE, message=FALSE, fig.width=12, fig.height=6}
+#lets first join airports and flights to find states SW flies to. 
+sw_join <- full_join(airports, flights, by=c("iata"="dest"))
+
+#dataset with only SouthWest airline flights and no NAs. 
+sw_flights <- sw_join %>% 
+  filter(!is.na(flight)) %>% 
+  filter((carrier == "WN")) 
+sw_flights
+
+sw_tot <- sw_flights %>% 
+  select(flight) %>% 
+  tally() %>% 
+  rename(tot_sw = n)
+sw_tot
+
+#find state where flight paths tend to fly to (so dont group by destination)
+sw_fp <- sw_flights %>% 
+  group_by(flight, state) %>% 
+  tally() %>% 
+  rename(flight_dest = n) %>% 
+  arrange(desc(flight_dest))
+sw_fp
+
+#gives us the common flight destinations for flight paths.
+
+#find states flights tend to fly to 
+sw_states <- sw_flights %>% 
+  select(state, iata) %>% 
+  group_by(state, iata) %>% 
+  tally() %>% 
+  rename(state_count = n) %>% 
+  arrange(desc(state_count))
+sw_states
+
 
 ```
-
-
-
-
 
 ## Question 4:
 
@@ -98,6 +192,38 @@ I want to know proportionately what regions (NE, south, west, midwest) each
 carrier flies to/from Houston in the month of July.  Consider the `month()`
 function from the `lubridate` package.
 
-```{r, echo=FALSE, message=FALSE, fig.width=12, fig.height=6}
+```{r, echo=TRUE, message=FALSE, fig.width=12, fig.height=6}
+library(lubridate)
+
+#month function. proportionally. carrier region total/ flight total
+#carrier region total/ flight total. 
+
+#sw_join was data made earlier, joiningg airoprts and flights dataset togehter. 
+sw_join <- full_join(airports, flights, by=c("iata"="dest"))
+region <- full_join(sw_join, states, by = "state")
+
+
+July_Flight <- region %>% 
+  filter(!is.na(carrier) & (!is.na(date)))  %>% 
+  mutate(month = month(date)) %>% 
+  filter(month == 7) 
+ # filter(carrier == "AA")  Testing my proportion by checking to see if AA only flew to a                   Southern regions as computed by our proportion below. checks out!
+                            
+regionTot <- July_Flight %>% 
+  group_by(carrier, region) %>% 
+  tally() %>% 
+  rename(region_fly_tot = n) %>%  
+arrange(desc(region_fly_tot))     #looks like most flights are going to the South.                                             connecting flights perhaps?
+
+flight_tot <- July_Flight %>% 
+  group_by(carrier) %>% 
+  tally() %>% 
+  rename(tot_flights = n) %>% 
+arrange(desc(tot_flights))       #alright now we have all flights by carriers! 
+  
+#to compute this proportion, let's join region flight totals and flights totals looks like the 
+props <- left_join(regionTot, flight_tot, by="carrier") %>% 
+  mutate(prop_region = (region_fly_tot/tot_flights)) 
+ # arrange(carrier)
 
 ```
