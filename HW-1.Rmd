@@ -8,7 +8,7 @@ output:
     collapsed: false
     smooth_scroll: false
 ---
-deleted cache = true; for unknown reasons
+
 ```{r, echo=FALSE, message=FALSE}
 
 library(ggplot2)
@@ -19,7 +19,7 @@ library(lubridate)
 
 # Load data sets. Note this assumes this .Rmd files is in the same directory as
 # the .csv files.
-flights <- read_csv("data/flights.csv") %>% 
+flights <- read_csv("data/flights.csv") %>%
   mutate(date=as.Date(date))
 weather <- read_csv("data/weather.csv") %>% 
   mutate(date=as.Date(date))
