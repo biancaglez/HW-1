@@ -140,6 +140,7 @@ legroom_yr <- planes %>%
                           #question, can I arrange by two variables?? ie the two lowest variables                           followed by the next two lowest, and so on. 
 legroom_yr
 ```
+
 ## Question 3:
 
 * What states did Southwest Airlines' **flight paths** tend to fly to?
@@ -173,7 +174,6 @@ sw_fp <- sw_flights %>%
 sw_fp
 
 #gives us the common flight destinations for flight paths.
-
 #find states flights tend to fly to 
 sw_states <- sw_flights %>% 
   select(state, iata) %>% 
