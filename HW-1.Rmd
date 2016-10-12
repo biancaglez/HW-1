@@ -10,7 +10,8 @@ output:
 ---
 
 ```{r, echo=FALSE, message=FALSE}
-
+library(knitr)
+library(lubridate)
 library(ggplot2)
 library(dplyr)
 # For read_csv() command, which is an improved version of base R's read.csv()
@@ -69,16 +70,15 @@ minutes tend to occur.
   #find the number of flights delayed per carrier
   flights_delay <- flights %>% 
     filter(dep_delay >= 30) %>% 
-    group_by(date2, dep_delay, carrier) %>% 
+    group_by(date2) %>% 
     tally() %>% 
     rename(num_flights_30 = n) %>% 
     arrange(desc(num_flights_30))
- # flights_delay
-  
-
-#this is the total number of flights per carrier
-flights_tot <- flights %>%    # filter(carrier == "AA" || carrier == "DL")
-  group_by(date2, carrier) %>% 
+  knitr::kable(flights_delay)
+ 
+#this is the total number of flights
+flights_tot <- flights %>%  
+  group_by(date2) %>% 
   tally() %>% 
   rename(num_flights = n)
 #flights_tot
@@ -86,20 +86,26 @@ flights_tot <- flights %>%    # filter(carrier == "AA" || carrier == "DL")
 #join these datasets so we can mutuate and compute proportion
 flights_prop <- inner_join(flights_tot, flights_delay, by="date2") %>% 
   mutate(proportion_flight_delayed = num_flights_30/num_flights)
-flights_prop
+knitr::kable(flights_prop)
 #now to plot! 
 #yaxis proportion. x axis time, so lets try months over this year. 
-#add flight carrier?
-ggplot(data=flights_prop, aes(x=date2, y=proportion_flight_delayed , col=carrier.y)) +
-geom_line()
 
-# I like this plot, but I don't like that there is so much noise, for so many carriers. Also, when looking at the data, I think there is room here for a statistical test to see what carriers are statistically signifcantly late. 
+#1. what am I plotting as line? why not the proportion value?
+flights_prop %>% 
+  mutate(date2=as.numeric(date2)) %>% 
+ggplot(aes(x=date2, y=proportion_flight_delayed)) +
+geom_line() + 
+  scale_x_continuous(breaks=c(1:12)) +
+         labs(x = "Months", y = "Proportion of flights delayed", 
+              title = "Proportion of Flights delayed more than 30 minutes")
 
-#These plots shows the proportion of the airlines flights that were late throughout the year. Prefer this plot b/c. 
+```
 
-ggplot(data=flights_prop, aes(x=date2, y=proportion_flight_delayed)) + facet_wrap(~carrier.y) +
-geom_line()
 
+```{r, echo=FALSE, message=FALSE, fig.width=12, fig.height=6}
+#These plots shows the proportion of the airlines flights that were late throughout the year. 
+#ggplot(data=flights_prop, aes(x=date2, y=proportion_flight_delayed)) + facet_wrap(~carrier.y) +
+#geom_line()
 
 ```
 
@@ -108,37 +114,20 @@ geom_line()
 Some people prefer flying on older planes.  Even though they aren't as nice,
 they tend to have more room.  Which airlines should these people favor?
 
-year insufficient in providing the comfort of a passenger
-so I'm using different proxies, including year to determine
-what planes have more room. :
-
-      -no.seats = less seats the more likely to have extra leg room!
-      -no.eng = more engines, bigger plane!
-      
-by arranging in descending order of number of engines, and the number of seats, we find the 
-planes that are the largest (number of engines) and have the least number of seats
-
-Looks like CANADAIR LTD and AVIONS MARCEL DASSAULT have most legroom. 
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
-
-leg_room <- planes %>% 
-  filter(!is.na(year)) %>%   
-  group_by(no.eng, mfr, year) %>%  #to get size of planes by carriers (mfr)and years
-  summarise(min_seats = min(no.seats)) %>%  #get the number of seats for size of planes
-  arrange(desc(no.eng)) 
-leg_room
-
-
 #Let's just look at age of plane as per the assignment to find most legroom
+#need to find not the airplane, but airline... so join with dataset flights to get carrier
+#also need to find mean number of years for each carrier. 
+legroom_yr <- inner_join(planes, flights, by= "plane")
 
-legroom_yr <- planes %>% 
+legroom_yr %>% 
   filter(!is.na(year)) %>%   
-  group_by(mfr, year) %>%  #to get size of planes by carriers (mfr)and years
-  summarise(min_seats = min(no.seats)) %>%  #get the number of seats for size of planes
-  arrange(year, min_seats) 
-                          #question, can I arrange by two variables?? ie the two lowest variables                           followed by the next two lowest, and so on. 
-legroom_yr
+  group_by(carrier) %>%  #to get size of planes by carriers (mfr)and years
+  summarise(mean_years = mean(year))   #get the number of seats for size of planes
+#knitr::kable(legroom_yr)
+
+
 ```
 
 ## Question 3:
@@ -157,21 +146,20 @@ sw_join <- full_join(airports, flights, by=c("iata"="dest"))
 sw_flights <- sw_join %>% 
   filter(!is.na(flight)) %>% 
   filter((carrier == "WN")) 
-sw_flights
 
 sw_tot <- sw_flights %>% 
   select(flight) %>% 
   tally() %>% 
   rename(tot_sw = n)
-sw_tot
 
 #find state where flight paths tend to fly to (so dont group by destination)
 sw_fp <- sw_flights %>% 
   group_by(flight, state) %>% 
   tally() %>% 
   rename(flight_dest = n) %>% 
-  arrange(desc(flight_dest))
-sw_fp
+    head(10) %>%
+    format(big.mark = ",") %>%
+    knitr::kable("markdown", align = c('l', 'r'))
 
 #gives us the common flight destinations for flight paths.
 #find states flights tend to fly to 
@@ -180,8 +168,9 @@ sw_states <- sw_flights %>%
   group_by(state, iata) %>% 
   tally() %>% 
   rename(state_count = n) %>% 
-  arrange(desc(state_count))
-sw_states
+  head(10) %>%
+    format(big.mark = ",") %>%
+    knitr::kable("markdown", align = c('l', 'r'))
 
 
 ```
@@ -193,7 +182,6 @@ carrier flies to/from Houston in the month of July.  Consider the `month()`
 function from the `lubridate` package.
 
 ```{r, echo=TRUE, message=FALSE, fig.width=12, fig.height=6}
-library(lubridate)
 
 #month function. proportionally. carrier region total/ flight total
 #carrier region total/ flight total. 
@@ -207,23 +195,29 @@ July_Flight <- region %>%
   filter(!is.na(carrier) & (!is.na(date)))  %>% 
   mutate(month = month(date)) %>% 
   filter(month == 7) 
- # filter(carrier == "AA")  Testing my proportion by checking to see if AA only flew to a                   Southern regions as computed by our proportion below. checks out!
                             
 regionTot <- July_Flight %>% 
-  group_by(carrier, region) %>% 
+  group_by(region, carrier) %>% 
   tally() %>% 
-  rename(region_fly_tot = n) %>%  
-arrange(desc(region_fly_tot))     #looks like most flights are going to the South.                                             connecting flights perhaps?
+  rename(region_fly_tot = n) 
 
 flight_tot <- July_Flight %>% 
-  group_by(carrier) %>% 
+  group_by(region) %>%       
   tally() %>% 
-  rename(tot_flights = n) %>% 
-arrange(desc(tot_flights))       #alright now we have all flights by carriers! 
-  
-#to compute this proportion, let's join region flight totals and flights totals looks like the 
-props <- left_join(regionTot, flight_tot, by="carrier") %>% 
+  rename(tot_flights = n) 
+```
+
+```{r, echo=TRUE, message=FALSE, fig.width=12, fig.height=6}
+#to compute this proportion, let's join region flight totals and flights totals 
+props <- left_join(regionTot, flight_tot, by="region") %>% 
   mutate(prop_region = (region_fly_tot/tot_flights)) 
- # arrange(carrier)
+
+#mutate(props, prop_region=as.numeric(prop_region)) 
+
+ggplot(data = props, aes(x=carrier, y=prop_region, col = region)) +
+geom_point() +
+         labs(x = "Airline Carrier", y = "Proportion", 
+              title = "Proportionately what regions each 
+airline carrier flies to in July")
 
 ```
