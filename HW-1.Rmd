@@ -156,10 +156,11 @@ sw_tot <- sw_flights %>%
 sw_fp <- sw_flights %>% 
   group_by(flight, state) %>% 
   tally() %>% 
-  rename(flight_dest = n) %>% 
-    head(10) %>%
-    format(big.mark = ",") %>%
-    knitr::kable("markdown", align = c('l', 'r'))
+  rename(flight_dest = n)
+sw_fp
+   # head(10) %>%
+  #  format(big.mark = ",") %>%
+   # knitr::kable(sw_fp)
 
 #gives us the common flight destinations for flight paths.
 #find states flights tend to fly to 
